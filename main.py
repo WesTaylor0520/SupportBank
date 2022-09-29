@@ -1,5 +1,7 @@
 import csv
 import json
+import xmltodict
+import xml.etree.ElementTree as ET
 from decimal import *
 import logging
 from dateutil.parser import *
@@ -103,8 +105,54 @@ def jsonToDict(file):
     return dictNameAndBalance
 
 
+def getValuesAtDeepestLayer(my_dict):
+    sub_vals = []
+
+    actual_vals = []
+    for val in my_dict.values():
+        try:
+            sub_vals += getValuesAtDeepestLayer(val)
+        except AttributeError:
+            actual_vals += [val]
+
+    return sub_vals + actual_vals
+
+
 def xmlToDict(file):
-    pass
+    tree = ET.parse(file)
+    xml_data = tree.getroot()
+    xmlstr = ET.tostring(xml_data, encoding='utf-8', method='xml')
+
+    data_dict = dict(xmltodict.parse(xmlstr))
+
+    listDeepestLayer = getValuesAtDeepestLayer(data_dict)
+    lenOfTransactions = len(listDeepestLayer[0])
+
+    rowCounter = 0
+    dictNameAndBalance = {}
+    for i in range(lenOfTransactions):
+        data = data_dict["TransactionList"]["SupportTransaction"][i]
+        date = data["@Date"]
+        debt = str(data["Value"])
+
+        if validateAmount(debt, rowCounter, file):  # and validateDate(date, rowCounter, file):
+            debtDecimal = Decimal(debt)
+
+            if data["Parties"]["From"] not in dictNameAndBalance.keys():
+                dictNameAndBalance[data["Parties"]["From"]] = 0
+            if data["Parties"]["To"] not in dictNameAndBalance.keys():
+                dictNameAndBalance[data["Parties"]["To"]] = 0
+
+            fromAccountChange = Decimal(dictNameAndBalance[data["Parties"]["From"]])
+            fromAccountChange -= debtDecimal
+            dictNameAndBalance[data["Parties"]["From"]] = fromAccountChange
+
+            ToAccountChange = Decimal(dictNameAndBalance[data["Parties"]["To"]])
+            ToAccountChange += debtDecimal
+            dictNameAndBalance[data["Parties"]["To"]] = ToAccountChange
+        rowCounter += 1
+    return dictNameAndBalance
+
 
 def listAll():
     print("\n")
@@ -129,6 +177,22 @@ def listAccount(inputName):
             for row in jsonDict:
                 if row["fromAccount"] == inputName or row["toAccount"] == inputName:
                     print(row["date"], row["narrative"])
+        elif ".xml" in transaction:
+            tree = ET.parse(transaction)
+            xml_data = tree.getroot()
+            xmlstr = ET.tostring(xml_data, encoding='utf-8', method='xml')
+
+            data_dict = dict(xmltodict.parse(xmlstr))
+
+            listDeepestLayer = getValuesAtDeepestLayer(data_dict)
+            lenOfTransactions = len(listDeepestLayer[0])
+
+            for i in range(lenOfTransactions):
+                data = data_dict["TransactionList"]["SupportTransaction"][i]
+                nameFrom = data["Parties"]["From"]
+                nameTo = data["Parties"]["To"]
+                if nameFrom == inputName or nameTo == inputName:
+                    print(data["@Date"], data["Description"])
 
     print("\n")
 
@@ -179,7 +243,15 @@ def main():
                     mergeDicts(OWED, newDict)
                     print("File added to database\n")
             elif fileType == "3":
-                pass
+                completeFileName = fileName + ".xml"
+                if transactionsListDuplication(completeFileName):
+                    print("Transaction document already exists in system\n"
+                          "Document not added to Database\n")
+                else:
+                    FILES.append(completeFileName)
+                    newDict = xmlToDict(completeFileName)
+                    mergeDicts(OWED, newDict)
+                    print("File added to database\n")
 
             else:
                 print("Sorry your chosen file cannot be found")
@@ -194,4 +266,6 @@ def main():
             print("Sorry that is not a valid input, Please try again\n")
 
 
-main()
+if __name__ == "__main__":
+    main()
+
