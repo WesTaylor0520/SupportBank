@@ -1,3 +1,5 @@
 INFO:root:Code started
-INFO:root:firstCSV Created
-INFO:root:secondCSV failed to be created
+INFO:root:Incorrect formatting of One Cheeseburger in Amount column of row 26 in input DodgyTransactions2015.csv
+INFO:root:Row 26 in input DodgyTransactions2015.csv has been skipped
+INFO:root:Incorrect formatting of Last Thursday in Date column of row 50 in input DodgyTransactions2015.csv
+INFO:root:Row 50 in input DodgyTransactions2015.csv has been skipped
