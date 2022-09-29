@@ -1,4 +1,5 @@
 import csv
+import json
 from decimal import *
 import logging
 from dateutil.parser import *
@@ -27,7 +28,14 @@ def validateAmount(amount, row, file):
         return False
 
 
-def addToBalanceDict(file):
+def mergeDicts(dict1, dict2):
+    for key, value in dict2.items():
+        dict1[key] = dict1[key] + dict2[key]
+
+    return dict1
+
+
+def csvToDict(file):
     BalanceDict = {}
     rowCounter = 0
     with open(file, mode="r") as csv_file:
@@ -54,17 +62,52 @@ def addToBalanceDict(file):
     return BalanceDict
 
 
+def jsonToDict(file):
+    f = open(file)
+    jsonDict = json.load(f)
+
+    BalanceDict = {}
+    rowCounter = 0
+    for row in jsonDict:
+        date = row["date"]
+        debt = str(row["amount"])
+        if validateAmount(debt, rowCounter, file) and validateDate(date, rowCounter, file):
+            debtDecimal = Decimal(debt)
+
+            if row["fromAccount"] not in BalanceDict.keys():
+                BalanceDict[row["fromAccount"]] = 0
+            if row["toAccount"] not in BalanceDict.keys():
+                BalanceDict[row["toAccount"]] = 0
+
+            fromAccountChange = Decimal(BalanceDict[row["fromAccount"]])
+            fromAccountChange -= debtDecimal
+            BalanceDict[row["fromAccount"]] = fromAccountChange
+
+            ToAccountChange = Decimal(BalanceDict[row["toAccount"]])
+            ToAccountChange += debtDecimal
+            BalanceDict[row["toAccount"]] = ToAccountChange
+        rowCounter += 1
+    for k, v in BalanceDict.items():
+        print(k, v)
+
+
 def listAll():
-    firstCSV = addToBalanceDict("Transactions2014.csv")
+    firstCSV = csvToDict("Transactions2014.csv")
     print("\nFirst CSV \n")
 
     for k, v in firstCSV.items():
         print(k, v)
 
-    secondCSV = addToBalanceDict("DodgyTransactions2015.csv")
+    secondCSV = csvToDict("DodgyTransactions2015.csv")
     print("\nSecond CSV \n")
 
     for k, v in secondCSV.items():
+        print(k, v)
+
+    merged = mergeDicts(firstCSV, secondCSV)
+    print("\nMerged \n")
+
+    for k, v in merged.items():
         print(k, v)
 
 
@@ -88,4 +131,5 @@ def listAccount(inputName):
 #     elif:
 #         response
 
-listAll()
+# listAll()
+jsonToDict("Transactions2013.json")
