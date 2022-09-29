@@ -7,6 +7,9 @@ from dateutil.parser import *
 logging.basicConfig(filename="SupportBank.log", filemode="w", level=logging.DEBUG)
 logging.info("Code started")
 
+OWED = {}
+FILES = []
+
 
 def validateDate(date, row, file, fuzzy=False):
     try:
@@ -28,15 +31,25 @@ def validateAmount(amount, row, file):
         return False
 
 
+def transactionsListDuplication(transactionList):
+    if transactionList in FILES:
+        return True
+    else:
+        return False
+
+
 def mergeDicts(dict1, dict2):
     for key, value in dict2.items():
-        dict1[key] = dict1[key] + dict2[key]
+        if dict2[key] in dict1.keys():
+            dict1[key] = dict1[key] + dict2[key]
+        else:
+            dict1[key] = value
 
     return dict1
 
 
 def csvToDict(file):
-    BalanceDict = {}
+    dictNameAndBalance = {}
     rowCounter = 0
     with open(file, mode="r") as csv_file:
         csv_reader = csv.DictReader(csv_file)
@@ -46,27 +59,27 @@ def csvToDict(file):
             if validateAmount(debt, rowCounter, file) and validateDate(date, rowCounter, file):
                 debtDecimal = Decimal(debt)
 
-                if row["From"] not in BalanceDict.keys():
-                    BalanceDict[row["From"]] = 0
-                if row["To"] not in BalanceDict.keys():
-                    BalanceDict[row["To"]] = 0
+                if row["From"] not in dictNameAndBalance.keys():
+                    dictNameAndBalance[row["From"]] = 0
+                if row["To"] not in dictNameAndBalance.keys():
+                    dictNameAndBalance[row["To"]] = 0
 
-                fromAccountChange = Decimal(BalanceDict[row["From"]])
+                fromAccountChange = Decimal(dictNameAndBalance[row["From"]])
                 fromAccountChange -= debtDecimal
-                BalanceDict[row["From"]] = fromAccountChange
+                dictNameAndBalance[row["From"]] = fromAccountChange
 
-                ToAccountChange = Decimal(BalanceDict[row["To"]])
+                ToAccountChange = Decimal(dictNameAndBalance[row["To"]])
                 ToAccountChange += debtDecimal
-                BalanceDict[row["To"]] = ToAccountChange
+                dictNameAndBalance[row["To"]] = ToAccountChange
             rowCounter += 1
-    return BalanceDict
+    return dictNameAndBalance
 
 
 def jsonToDict(file):
     f = open(file)
     jsonDict = json.load(f)
 
-    BalanceDict = {}
+    dictNameAndBalance = {}
     rowCounter = 0
     for row in jsonDict:
         date = row["date"]
@@ -74,62 +87,111 @@ def jsonToDict(file):
         if validateAmount(debt, rowCounter, file) and validateDate(date, rowCounter, file):
             debtDecimal = Decimal(debt)
 
-            if row["fromAccount"] not in BalanceDict.keys():
-                BalanceDict[row["fromAccount"]] = 0
-            if row["toAccount"] not in BalanceDict.keys():
-                BalanceDict[row["toAccount"]] = 0
+            if row["fromAccount"] not in dictNameAndBalance.keys():
+                dictNameAndBalance[row["fromAccount"]] = 0
+            if row["toAccount"] not in dictNameAndBalance.keys():
+                dictNameAndBalance[row["toAccount"]] = 0
 
-            fromAccountChange = Decimal(BalanceDict[row["fromAccount"]])
+            fromAccountChange = Decimal(dictNameAndBalance[row["fromAccount"]])
             fromAccountChange -= debtDecimal
-            BalanceDict[row["fromAccount"]] = fromAccountChange
+            dictNameAndBalance[row["fromAccount"]] = fromAccountChange
 
-            ToAccountChange = Decimal(BalanceDict[row["toAccount"]])
+            ToAccountChange = Decimal(dictNameAndBalance[row["toAccount"]])
             ToAccountChange += debtDecimal
-            BalanceDict[row["toAccount"]] = ToAccountChange
+            dictNameAndBalance[row["toAccount"]] = ToAccountChange
         rowCounter += 1
-    for k, v in BalanceDict.items():
-        print(k, v)
+    return dictNameAndBalance
 
+
+def xmlToDict(file):
+    pass
 
 def listAll():
-    firstCSV = csvToDict("Transactions2014.csv")
-    print("\nFirst CSV \n")
-
-    for k, v in firstCSV.items():
+    print("\n")
+    for k, v in OWED.items():
         print(k, v)
-
-    secondCSV = csvToDict("DodgyTransactions2015.csv")
-    print("\nSecond CSV \n")
-
-    for k, v in secondCSV.items():
-        print(k, v)
-
-    merged = mergeDicts(firstCSV, secondCSV)
-    print("\nMerged \n")
-
-    for k, v in merged.items():
-        print(k, v)
+    print("\n")
 
 
 def listAccount(inputName):
-    with open("Transactions2014.csv", mode="r") as csv_file:
-        csv_reader = csv.DictReader(csv_file)
+    for transaction in FILES:
+        if ".csv" in transaction:
+            with open(transaction, mode="r") as csv_file:
+                csv_reader = csv.DictReader(csv_file)
 
-        for row in csv_reader:
-            if row["From"] == inputName or row["To"] == inputName:
-                print(row["Date"], row["Narrative"])
+                for row in csv_reader:
+                    if row["From"] == inputName or row["To"] == inputName:
+                        print(row["Date"], row["Narrative"])
+        elif ".json" in transaction:
+            f = open(transaction)
+            jsonDict = json.load(f)
+
+            for row in jsonDict:
+                if row["fromAccount"] == inputName or row["toAccount"] == inputName:
+                    print(row["date"], row["narrative"])
+
+    print("\n")
 
 
-# def main():
-#     response = input("Welcome \n"
-#                      "Please enter one of the following commands: \n"
-#                      "List All \n"
-#                      "List [Account])")
-#
-#     if response.lower() == "list all":
-#         listAll()
-#     elif:
-#         response
+def main():
+    end = False
+    while not end:
+        response = input("Welcome \n"
+                         "Please enter one of the following commands: \n"
+                         "1. List All \n"
+                         "2. List Account \n"
+                         "3. Import File \n"
+                         "4. Delete Database \n"
+                         "5. Quit \n")
 
-# listAll()
-jsonToDict("Transactions2013.json")
+        if response == "1":
+            listAll()
+
+        elif response == "2":
+            account = input("Please enter the name of the account: ")
+            listAccount(account)
+
+        elif response == "3":
+            fileName = input("Please enter the name of your file \n")
+            fileType = input("Please select a file type:\n"
+                             "1. CSV\n"
+                             "2. JSON\n"
+                             "3. XML\n")
+
+            if fileType == "1":
+                completeFileName = fileName + ".csv"
+                if transactionsListDuplication(completeFileName):
+                    print("Transaction document already exists in system\n"
+                          "Document not added to Database\n")
+                else:
+                    FILES.append(completeFileName)
+                    newDict = csvToDict(completeFileName)
+                    mergeDicts(OWED, newDict)
+                    print("File added to database\n")
+            elif fileType == "2":
+                completeFileName = fileName + ".json"
+                if transactionsListDuplication(completeFileName):
+                    print("Transaction document already exists in system\n"
+                          "Document not added to Database\n")
+                else:
+                    FILES.append(completeFileName)
+                    newDict = jsonToDict(completeFileName)
+                    mergeDicts(OWED, newDict)
+                    print("File added to database\n")
+            elif fileType == "3":
+                pass
+
+            else:
+                print("Sorry your chosen file cannot be found")
+
+        elif response == "4":
+            pass
+
+        elif response == "5":
+            end = True
+
+        else:
+            print("Sorry that is not a valid input, Please try again\n")
+
+
+main()
