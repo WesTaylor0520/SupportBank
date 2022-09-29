@@ -3,8 +3,10 @@ import json
 import xmltodict
 import xml.etree.ElementTree as ET
 from decimal import *
+import xlrd
 import logging
 from dateutil.parser import *
+
 
 logging.basicConfig(filename="SupportBank.log", filemode="w", level=logging.DEBUG)
 logging.info("Code started")
@@ -107,7 +109,6 @@ def jsonToDict(file):
 
 def getValuesAtDeepestLayer(my_dict):
     sub_vals = []
-
     actual_vals = []
     for val in my_dict.values():
         try:
@@ -116,6 +117,14 @@ def getValuesAtDeepestLayer(my_dict):
             actual_vals += [val]
 
     return sub_vals + actual_vals
+
+
+def convertOleToDateTime(ole):
+    ole = int(ole) - 2
+    datetime_date = xlrd.xldate_as_datetime(ole, 0)
+    date_object = datetime_date.date()
+    string_date = date_object.strftime("%d-%m-%Y")
+    return string_date
 
 
 def xmlToDict(file):
@@ -132,10 +141,10 @@ def xmlToDict(file):
     dictNameAndBalance = {}
     for i in range(lenOfTransactions):
         data = data_dict["TransactionList"]["SupportTransaction"][i]
-        date = data["@Date"]
+        date = convertOleToDateTime(data["@Date"])
         debt = str(data["Value"])
 
-        if validateAmount(debt, rowCounter, file):  # and validateDate(date, rowCounter, file):
+        if validateAmount(debt, rowCounter, file) and validateDate(date, rowCounter, file):
             debtDecimal = Decimal(debt)
 
             if data["Parties"]["From"] not in dictNameAndBalance.keys():
@@ -192,7 +201,7 @@ def listAccount(inputName):
                 nameFrom = data["Parties"]["From"]
                 nameTo = data["Parties"]["To"]
                 if nameFrom == inputName or nameTo == inputName:
-                    print(data["@Date"], data["Description"])
+                    print(convertOleToDateTime(data["@Date"]), data["Description"])
 
     print("\n")
 
@@ -268,4 +277,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
