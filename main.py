@@ -7,12 +7,8 @@ import xlrd
 import logging
 from dateutil.parser import *
 
-
 logging.basicConfig(filename="SupportBank.log", filemode="w", level=logging.DEBUG)
 logging.info("Code started")
-
-OWED = {}
-FILES = []
 
 
 def validateDate(date, row, file, fuzzy=False):
@@ -39,8 +35,8 @@ def validateAmount(amount, row, file):
         return False
 
 
-def validateUniqueTransactions(transactionList):
-    if transactionList in FILES:
+def validateUniqueTransactions(transactionList, files):
+    if transactionList in files:
         return True
     else:
         return False
@@ -167,17 +163,17 @@ def xmlToDict(file):
     return dictNameAndBalance
 
 
-def listAll():
-    if not OWED.items():
+def listAll(owed):
+    if not owed.items():
         print("No Accounts found")
-    for k, v in OWED.items():
+    for k, v in owed.items():
         print(k, v)
     print("\n")
 
 
-def listAccount(inputName):
+def listAccount(inputName, files):
     account = inputName[6:-1]
-    for transaction in FILES:
+    for transaction in files:
         if ".csv" in transaction:
             with open(transaction, mode="r") as csv_file:
                 csv_reader = csv.DictReader(csv_file)
@@ -212,45 +208,49 @@ def listAccount(inputName):
     print("\n")
 
 
-def importFile(response):
+def importFile(response, files, owed):
     fileName = response[13:-1]
 
     if ".csv" in fileName:
-        if validateUniqueTransactions(fileName):
+        if validateUniqueTransactions(fileName, files):
             print("Transaction document already exists in system\n"
                   "Document not added to Database\n")
         else:
-            FILES.append(fileName)
+            files.append(fileName)
             newDict = csvToDict(fileName)
-            mergeDicts(OWED, newDict)
+            mergeDicts(owed, newDict)
             print("File added to database\n")
     elif ".json" in fileName:
-        if validateUniqueTransactions(fileName):
+        if validateUniqueTransactions(fileName, files):
             print("Transaction document already exists in system\n"
                   "Document not added to Database\n")
         else:
-            FILES.append(fileName)
+            files.append(fileName)
             newDict = jsonToDict(fileName)
-            mergeDicts(OWED, newDict)
+            mergeDicts(owed, newDict)
             print("File added to database\n")
     elif ".xml" in fileName:
-        if validateUniqueTransactions(fileName):
+        if validateUniqueTransactions(fileName, files):
             print("Transaction document already exists in system\n"
                   "Document not added to Database\n")
         else:
-            FILES.append(fileName)
+            files.append(fileName)
             newDict = xmlToDict(fileName)
-            mergeDicts(OWED, newDict)
+            mergeDicts(owed, newDict)
             print("File added to database\n")
+    return files, owed
 
 
-def exportFile():
+def exportFile(owed):
     with open("file.txt", "w") as f:
-        for key, value in OWED.items():
+        for key, value in owed.items():
             f.write('%s:%s\n' % (key, value))
+    print("File exported")
 
 
 def main():
+    owed = {}
+    files = []
     end = False
     while not end:
         response = input("Welcome \n"
@@ -262,17 +262,17 @@ def main():
                          "Quit \n")
 
         if response == "List All":
-            listAll()
+            listAll(owed)
 
         elif "List [" in response:
-            listAccount(response)
+            listAccount(response, files)
 
         elif "Import File [" in response:
-            importFile(response)
+            files, owed = importFile(response, files, owed)
 
         elif "Export File [" in response:
-            importFile(response)
-            exportFile()
+            importFile(response, files, owed)
+            exportFile(owed)
 
         elif response == "Quit":
             end = True
